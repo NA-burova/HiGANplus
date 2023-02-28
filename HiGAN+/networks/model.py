@@ -440,6 +440,7 @@ class AdversarialModel(BaseModel):
                     plt.imshow(gen_imgs[i], cmap='gray')
                     plt.axis('off')
                 plt.tight_layout()
+                plt.savefig('./output/'+text+'.png')
                 plt.show()
 
     def eval_style(self):
@@ -487,19 +488,25 @@ class AdversarialModel(BaseModel):
                                                     [0, gen_imgs.shape[-1] - batch['org_imgs'].size(-1), 0, 0],
                                                     mode='constant', value=-1)
                 real_imgs = (1 - real_imgs).squeeze().cpu().numpy() * 127
-                plt.figure()
+                # plt.figure()
+
                 for i in range(nrow):
-                    plt.subplot(nrow, 1 + ncol, i * (1 + ncol) + 1)
+                    plt.figure()
+                    # plt.subplot(1, 1 + ncol, i * (1 + ncol) + 1)
                     # plt.imshow(real_imgs[i, :, :real_img_lens[i]], cmap='gray')
                     plt.imshow(real_imgs[i], cmap='gray')
                     plt.axis('off')
                     for j in range(ncol):
-                        plt.subplot(nrow, 1 + ncol, i * (1 + ncol) + 2 + j)
+                        plt.subplot(1, 1 + ncol, j+1)
                         # plt.imshow(gen_imgs[i * ncol + j, :, :gen_img_lens[i * ncol + j]], cmap='gray')
                         plt.imshow(gen_imgs[i * ncol + j], cmap='gray')
                         plt.axis('off')
-                plt.tight_layout()
-                plt.show()
+                    
+                    plt.savefig('./output/'+text+str(i)+'.png')
+                    plt.show()
+                # plt.tight_layout()
+                # plt.savefig('./output/'+text+str(i)+'.png')
+                # plt.show()
 
     def eval_rand(self):
         self.set_mode('eval')
@@ -529,14 +536,18 @@ class AdversarialModel(BaseModel):
                 gen_imgs = self.models.G(rand_styles, fake_lbs, fake_lb_lens)
                 gen_imgs = (1 - gen_imgs).squeeze().cpu().numpy() * 127
                 plt.figure()
+
                 for i in range(nrow):
+                    plt.figure()
                     for j in range(ncol):
-                        ax = plt.subplot(nrow, ncol, i * ncol + 1 + j)
+                        ax = plt.subplot(1, ncol, 1 + j)
                         gen_img = gen_imgs[i * ncol + j]
                         ax.imshow(gen_img, cmap='gray')
                         ax.axis('off')
-                plt.tight_layout()
-                plt.show()
+                    plt.savefig('./output/'+text+str(i)+'.png')
+                # plt.tight_layout()
+                # plt.savefig('./output/'+text+'.png')
+                # plt.show()
 
     def eval_text(self):
         self.set_mode('eval')
@@ -592,6 +603,7 @@ class AdversarialModel(BaseModel):
                     plt.imshow(gen_imgs[i, :, :gen_img_lens[i]], cmap='gray')
                     plt.axis('off')
                 plt.tight_layout()
+                plt.savefig('./output/'+text+'.png')
                 plt.show()
 
 
@@ -1177,6 +1189,7 @@ class WriterIdentifyModel(BaseModel):
         self.wid_loss = CrossEntropyLoss()
 
     def train(self):
+        torch.autograd.set_detect_anomaly(True)
         self.info()
 
         trainset_info = (self.opt.training.dset_name,
