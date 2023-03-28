@@ -1,7 +1,7 @@
 # HiGAN+
 ## What's new here:
 - Training on ru - [cyrillic handwriting dataset](https://www.kaggle.com/datasets/constantinwerner/cyrillic-handwriting-dataset) -- preprocessed: [train](https://disk.yandex.ru/d/kEAOx5-0-Kt2kw) [test](https://disk.yandex.ru/d/Mvzqo3NIGj-iCg) -- [checkpoint of full model](https://disk.yandex.ru/d/eaNj3iDJBeYpyw), [ocr](https://disk.yandex.ru/d/hgUlg-kfGeyqcQ), [wid](https://disk.yandex.ru/d/12PaaMHmMj-4bQ)
-- Generating dstasets on words from [cyrillic handwriting dataset](https://www.kaggle.com/datasets/constantinwerner/cyrillic-handwriting-dataset) - 4x size - [result](https://disk.yandex.ru/d/CxWfnJBtDklwWw) and from [htr_datasets/school_notebooks/](https://github.com/ai-forever/htr_datasets/tree/main/school_notebooks) - 4x size - have missing words because of facing characters not in alphabet (e.g. |) - result in 4 parts [test](https://disk.yandex.ru/d/nsL0cuZfh5HA8g) - [val](https://disk.yandex.ru/d/0MtW4nbRW_Gv1g) - [train1](https://disk.yandex.ru/d/lz3uLuN038OvNA) - [train2](https://disk.yandex.ru/d/crMuxCiXEFpzjA)
+- Generating datasets on words from [cyrillic handwriting dataset](https://www.kaggle.com/datasets/constantinwerner/cyrillic-handwriting-dataset) - 4x size - [result](https://disk.yandex.ru/d/CxWfnJBtDklwWw) and from [htr_datasets/school_notebooks/](https://github.com/ai-forever/htr_datasets/tree/main/school_notebooks) - 4x size - have missing words because of facing characters not in alphabet (e.g. |) - result in 4 parts [test](https://disk.yandex.ru/d/nsL0cuZfh5HA8g) - [val](https://disk.yandex.ru/d/0MtW4nbRW_Gv1g) - [train1](https://disk.yandex.ru/d/lz3uLuN038OvNA) - [train2](https://disk.yandex.ru/d/crMuxCiXEFpzjA)
 
 ### All stuff below is from original repo
 ## Introduction
