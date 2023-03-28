@@ -39,6 +39,8 @@ if __name__ == '__main__':
         model.eval_style()
     elif args.mode == 'rand':
         model.eval_rand()
+    elif args.mode == 'repro':
+        model.eval_repro()
     elif args.mode == 'interp':
         model.eval_interp()
     elif args.mode == 'text':
