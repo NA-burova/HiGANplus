@@ -149,7 +149,7 @@ class AdversarialModel(BaseModel):
             batch_size=opt.training.batch_size,
             shuffle=True,
             collate_fn=self.collect_fn,
-            num_workers=4,
+            num_workers=2,
             drop_last=True
         )
 
@@ -287,7 +287,7 @@ class AdversarialModel(BaseModel):
             collate_fn=self.collect_fn,
             batch_size=self.opt.valid.batch_size,
             shuffle=False,
-            num_workers=4
+            num_workers=2
         )
 
         if 'E' not in self.models:
@@ -549,6 +549,78 @@ class AdversarialModel(BaseModel):
                 # plt.savefig('./output/'+text+'.png')
                 # plt.show()
 
+    def eval_repro(self):
+        self.set_mode('eval')
+
+        with torch.no_grad():
+            nrow, ncol = self.opt.test.nrow, 2
+            rand_z = prepare_z_dist(nrow, self.opt.EncModel.style_dim, self.device)
+            import pandas as pd
+            import os
+            import shutil
+            if self.opt.test.source[-3:]=='tsv':
+                source=pd.read_table(self.opt.test.source, header=None)
+                i0=0
+                i1=1
+            else:
+                source=pd.read_csv(self.opt.test.source)
+                i0='file'
+                i1='text'
+            
+            if not os.path.exists(self.opt.test.save_to):
+                os.makedirs(self.opt.test.save_to)
+            k=0
+            alpha=get_true_alphabet(self.opt.dataset)
+            for idx, line in source.iterrows():
+                k+=1
+                if k<self.opt.test.k:
+                  continue
+                text = str(line[i1])
+                name=line[i0]
+                if len(text) == 0:
+                    continue
+                if any([i not in alpha for i in text]):
+                  print('Character not in alphabet for '+text, '-- skipping')
+                  continue
+                texts = text.split(' ')
+                ncol = len(texts)
+                if len(texts) == 1:
+                    fake_lbs = self.label_converter.encode(texts)
+                    fake_lbs = torch.LongTensor(fake_lbs)
+                    fake_lb_lens = torch.IntTensor([len(texts[0])])
+                else:
+                    fake_lbs, fake_lb_lens = self.label_converter.encode(texts)
+
+                fake_lbs = fake_lbs.repeat(nrow, 1).to(self.device)
+                fake_lb_lens = fake_lb_lens.repeat(nrow, ).to(self.device)
+
+                rand_z.sample_()
+                rand_styles = rand_z.unsqueeze(1).repeat(1, ncol, 1).view(nrow * ncol, self.opt.GenModel.style_dim)
+                gen_imgs = self.models.G(rand_styles, fake_lbs, fake_lb_lens)
+                gen_imgs = (1 - gen_imgs).squeeze().cpu().numpy() * 127
+
+                for i in range(nrow):
+                    plt.figure()
+                    for j in range(ncol):
+                        ax = plt.subplot(1, ncol, 1 + j)
+                        gen_img = gen_imgs[i * ncol + j]
+                        ax.imshow(gen_img, cmap='gray')
+                        ax.axis('off')
+                    plt.tight_layout()
+                    plt.savefig(self.opt.test.save_to+name+'_'+str(i)+'.png')
+                    plt.close()
+                    w=pd.DataFrame([[name+'_'+str(i)+'.png', text]], columns=['file', 'text'])
+                    w.to_csv(self.opt.test.index_to, mode='a', header=not os.path.exists(self.opt.test.index_to))
+                if not k % 1000:
+                    shutil.make_archive('save', 'zip', self.opt.test.save_to2)
+                    shutil.copy('save.zip', self.opt.test.save_to3)
+                if not k % 100:
+                    print(k, line[i0], line[i1])
+                if k==self.opt.test.k_max:
+                  break
+            shutil.make_archive('save', 'zip', self.opt.test.save_to2)
+            shutil.copy('save.zip', self.opt.test.save_to3)
+
     def eval_text(self):
         self.set_mode('eval')
 
@@ -703,10 +775,14 @@ class GlobalLocalAdversarialModel(AdversarialModel):
         else:
             ctc_len_scale = self.models.R.len_scale
 
-        best_fid = np.inf
-        iter_count = 0
+        best_fid = self.opt.training.best_fid
+        iter_count = self.opt.training.start_from
+        epoch_done = self.opt.training.epoch_done
         for epoch in range(epoch_done, self.opt.training.epochs):
             for i, batch in enumerate(self.train_loader):
+                iter_count += 1
+                if iter_count<self.opt.training.iter_count:
+                    continue
                 #############################
                 # Prepare inputs & Network Forward
                 #############################
@@ -958,7 +1034,12 @@ class GlobalLocalAdversarialModel(AdversarialModel):
                         os.makedirs(sample_root) if self.local_rank < 1 else None
                     self.sample_images(iter_count + 1) if self.local_rank < 1 else None
 
-                iter_count += 1
+                    ckpt_root = os.path.join(self.log_root, self.opt.training.ckpt_dir)
+                    if not os.path.exists(ckpt_root):
+                        os.makedirs(ckpt_root)
+
+                    self.save('inepoch'+str(iter_count), epoch)
+
 
             if epoch:
                 ckpt_root = os.path.join(self.log_root, self.opt.training.ckpt_dir)
@@ -974,10 +1055,13 @@ class GlobalLocalAdversarialModel(AdversarialModel):
                     if 'fid' in scores and scores['fid'] < best_fid:
                         best_fid = scores['fid']
                         self.save('best', epoch, **scores) if self.local_rank < 1 else None
+                        print('saving with best FID = ', best_fid)
 
                     if self.writer:
                         for key, val in scores.items():
                             self.writer.add_scalar('valid/%s' % key, val, epoch) if self.local_rank < 1 else None
+                if epoch % self.opt.training.save_epoch_val == 0:
+                    self.save('last', epoch)
 
                 if self.local_rank > -1:
                     dist.barrier()
@@ -1029,7 +1113,7 @@ class RecognizeModel(BaseModel):
             batch_size=self.opt.training.batch_size,
             shuffle=True,
             collate_fn=self.collect_fn,
-            num_workers=4
+            num_workers=2
         )
 
         self.optimizers = Munch(R=torch.optim.Adam(self.models.R.parameters(), lr=self.opt.training.lr))
@@ -1111,6 +1195,8 @@ class RecognizeModel(BaseModel):
                     if self.writer:
                         self.writer.add_scalar('valid/WER', wer, epoch)
                         self.writer.add_scalar('valid/CER', cer, epoch)
+                if epoch % self.opt.training.save_epoch_val == 0:
+                    self.save('last', epoch)
 
             for scheduler in self.lr_schedulers.values():
                 scheduler.step(epoch)
@@ -1202,7 +1288,7 @@ class WriterIdentifyModel(BaseModel):
             batch_size=self.opt.training.batch_size,
             shuffle=True,
             collate_fn=get_collect_fn(sort_input=True, sort_style=False),
-            num_workers=4
+            num_workers=2
         )
 
         if self.opt.training.frozen_backbone:
@@ -1287,6 +1373,8 @@ class WriterIdentifyModel(BaseModel):
                         self.save('best', epoch, WRR=wrr)
                     if self.writer:
                         self.writer.add_scalar('valid/WRR', wrr, epoch)
+                if epoch % self.opt.training.save_epoch_val == 0:
+                    self.save('last', epoch)
 
             for scheduler in self.lr_schedulers.values():
                 scheduler.step(epoch)
